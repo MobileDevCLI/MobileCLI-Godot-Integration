@@ -1,7 +1,7 @@
 # PayPal Payment Integration for MobileCLI
 
 **Status:** WORKING (January 25, 2026)
-**Price:** $4.99/month subscription
+**Price:** $15/month subscription
 **Can be reactivated anytime**
 
 ---
@@ -27,7 +27,7 @@ User clicks Subscribe
 PayPal Checkout (with custom_id = user_id)
     |
     v
-User Pays $4.99/month
+User Pays $15/month
     |
     v
 PayPal sends Webhook to Supabase Edge Function

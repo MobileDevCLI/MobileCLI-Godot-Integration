@@ -56,7 +56,7 @@ curl -v -X POST "https://api-m.paypal.com/v1/billing/plans" \
       "tenure_type": "REGULAR",
       "sequence": 1,
       "total_cycles": 0,
-      "pricing_scheme": {"fixed_price": {"value": "4.99", "currency_code": "USD"}}
+      "pricing_scheme": {"fixed_price": {"value": "15.00", "currency_code": "USD"}}
     }],
     "payment_preferences": {
       "auto_bill_outstanding": true,
@@ -70,7 +70,7 @@ curl -v -X POST "https://api-m.paypal.com/v1/billing/plans" \
 1. Go to: https://www.paypal.com/buttons/
 2. Click "Create Button"
 3. Select "Subscribe"
-4. Set price: $4.99/month
+4. Set price: $15/month
 5. Copy the Button ID
 
 **Current Button ID:** `DHCKPWE3PJ684`
@@ -250,7 +250,7 @@ curl -X POST "https://mwxlguqukyfberyhtkmg.supabase.co/functions/v1/paypal-webho
 | PayPal Button ID | `DHCKPWE3PJ684` |
 | Supabase Project | `mwxlguqukyfberyhtkmg` |
 | Webhook URL | `https://mwxlguqukyfberyhtkmg.supabase.co/functions/v1/paypal-webhook` |
-| Price | $4.99/month |
+| Price | $15/month |
 
 ---
 

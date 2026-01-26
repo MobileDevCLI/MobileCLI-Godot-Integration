@@ -123,7 +123,7 @@ curl -X POST "https://mwxlguqukyfberyhtkmg.supabase.co/functions/v1/paypal-webho
       "id": "SALE-ID-123",
       "custom_id": "USER-UUID-FROM-DATABASE",
       "amount": {
-        "total": "4.99",
+        "total": "15.00",
         "currency": "USD"
       }
     }
@@ -181,7 +181,7 @@ This is what a real PayPal webhook looks like:
       "last_payment": {
         "amount": {
           "currency_code": "USD",
-          "value": "4.99"
+          "value": "15.00"
         },
         "time": "2026-01-25T12:00:00Z"
       },

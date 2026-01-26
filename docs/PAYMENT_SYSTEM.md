@@ -4,7 +4,7 @@
 
 MobileCLI Pro uses PayPal Subscriptions + Supabase for payment processing.
 
-**Price:** $4.99/month
+**Price:** $15/month
 
 ## Architecture
 
