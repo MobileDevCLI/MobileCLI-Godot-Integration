@@ -419,21 +419,6 @@ class BootstrapInstaller(private val context: Context) {
 
                 # PS1 prompt
                 PS1='\[\e[32m\]\u@mobilecli\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]$ '
-
-                # Welcome message on new session
-                clear
-                echo ""
-                echo "  ╔═══════════════════════════════════════╗"
-                echo "  ║       Welcome to MobileCLI            ║"
-                echo "  ╚═══════════════════════════════════════╝"
-                echo ""
-                echo "  Start an AI assistant:"
-                echo "    claude  - Claude Code"
-                echo "    gemini  - Gemini CLI"
-                echo "    codex   - Codex CLI"
-                echo ""
-                echo "  Or use the terminal normally."
-                echo ""
             """.trimIndent())
         }
 
