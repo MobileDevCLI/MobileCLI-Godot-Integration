@@ -211,3 +211,4 @@ Security vulnerability fixes.
 
 - [GitHub Releases](https://github.com/MobileDevCLI/MobileCLI-Pro/releases)
 - [GitHub Repository](https://github.com/MobileDevCLI/MobileCLI-Pro)
+# Deploy trigger
