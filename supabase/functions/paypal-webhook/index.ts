@@ -126,23 +126,33 @@ Deno.serve(async (req: Request) => {
          eventType === "BILLING.SUBSCRIPTION.CREATED") && userId) {
       console.log("Activating subscription for user:", userId)
 
+      // FIX v2.1.2: Log the exact data being upserted for debugging
+      const upsertData = {
+        user_id: userId,
+        status: "active",
+        paypal_subscription_id: subscriptionId,
+        updated_at: new Date().toISOString()
+      }
+      console.log("Upserting subscription data:", JSON.stringify(upsertData))
+
       const { data, error } = await supabase
         .from("subscriptions")
-        .upsert({
-          user_id: userId,
-          status: "active",
-          paypal_subscription_id: subscriptionId,
-          updated_at: new Date().toISOString()
-        }, {
+        .upsert(upsertData, {
           onConflict: "user_id"
         })
         .select()
 
       if (error) {
-        console.error("Database error on activation:", error.message)
-        processingResult = `error: ${error.message}`
+        // FIX v2.1.2: Enhanced error logging to debug subscriptions table issues
+        console.error("Database error on activation:", JSON.stringify({
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        }))
+        processingResult = `error: ${error.message} | code: ${error.code} | details: ${error.details}`
       } else {
-        console.log("Subscription activated:", data)
+        console.log("Subscription activated successfully:", JSON.stringify(data))
         processingResult = "subscription_activated"
       }
     }
@@ -151,20 +161,30 @@ Deno.serve(async (req: Request) => {
     if (eventType === "PAYMENT.SALE.COMPLETED" && userId) {
       console.log("Payment completed for user:", userId)
 
-      const { error } = await supabase
+      const upsertData = {
+        user_id: userId,
+        status: "active",
+        updated_at: new Date().toISOString()
+      }
+      console.log("Upserting payment data:", JSON.stringify(upsertData))
+
+      const { data, error } = await supabase
         .from("subscriptions")
-        .upsert({
-          user_id: userId,
-          status: "active",
-          updated_at: new Date().toISOString()
-        }, {
+        .upsert(upsertData, {
           onConflict: "user_id"
         })
+        .select()
 
       if (error) {
-        console.error("Database error on payment:", error.message)
-        processingResult = `error: ${error.message}`
+        console.error("Database error on payment:", JSON.stringify({
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        }))
+        processingResult = `error: ${error.message} | code: ${error.code}`
       } else {
+        console.log("Payment upsert result:", JSON.stringify(data))
         processingResult = "payment_completed"
       }
 
@@ -188,7 +208,7 @@ Deno.serve(async (req: Request) => {
     if (eventType === "BILLING.SUBSCRIPTION.CANCELLED" && userId) {
       console.log("Cancelling subscription for user:", userId)
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("subscriptions")
         .upsert({
           user_id: userId,
@@ -198,13 +218,21 @@ Deno.serve(async (req: Request) => {
         }, {
           onConflict: "user_id"
         })
+        .select()
 
+      if (error) {
+        console.error("Database error on cancellation:", JSON.stringify(error))
+      } else {
+        console.log("Cancellation result:", JSON.stringify(data))
+      }
       processingResult = error ? `error: ${error.message}` : "subscription_cancelled"
     }
 
     // Handle suspension
     if (eventType === "BILLING.SUBSCRIPTION.SUSPENDED" && userId) {
-      const { error } = await supabase
+      console.log("Suspending subscription for user:", userId)
+
+      const { data, error } = await supabase
         .from("subscriptions")
         .upsert({
           user_id: userId,
@@ -213,13 +241,21 @@ Deno.serve(async (req: Request) => {
         }, {
           onConflict: "user_id"
         })
+        .select()
 
+      if (error) {
+        console.error("Database error on suspension:", JSON.stringify(error))
+      } else {
+        console.log("Suspension result:", JSON.stringify(data))
+      }
       processingResult = error ? `error: ${error.message}` : "subscription_suspended"
     }
 
     // Handle expiration
     if (eventType === "BILLING.SUBSCRIPTION.EXPIRED" && userId) {
-      const { error } = await supabase
+      console.log("Expiring subscription for user:", userId)
+
+      const { data, error } = await supabase
         .from("subscriptions")
         .upsert({
           user_id: userId,
@@ -228,7 +264,13 @@ Deno.serve(async (req: Request) => {
         }, {
           onConflict: "user_id"
         })
+        .select()
 
+      if (error) {
+        console.error("Database error on expiration:", JSON.stringify(error))
+      } else {
+        console.log("Expiration result:", JSON.stringify(data))
+      }
       processingResult = error ? `error: ${error.message}` : "subscription_expired"
     }
 

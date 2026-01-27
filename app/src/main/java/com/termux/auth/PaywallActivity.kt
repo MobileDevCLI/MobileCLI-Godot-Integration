@@ -289,6 +289,15 @@ class PaywallActivity : AppCompatActivity() {
             return
         }
 
+        // FIX v2.1.2: Check for existing subscription BEFORE creating new one
+        val existingLicense = licenseManager.getLicenseInfo()
+        if (existingLicense?.isPro() == true) {
+            Log.i(TAG, "User already has Pro subscription, preventing duplicate")
+            Toast.makeText(this, "You already have an active subscription!", Toast.LENGTH_LONG).show()
+            proceedToApp()
+            return
+        }
+
         Log.d(TAG, "Creating subscription for user: $userId")
         showProcessingState("Setting up payment...")
 
@@ -297,7 +306,19 @@ class PaywallActivity : AppCompatActivity() {
                 // Call our Edge Function to create subscription with proper custom_id
                 val approvalUrl = createSubscriptionViaApi(userId)
 
-                if (approvalUrl != null) {
+                if (approvalUrl == "DUPLICATE_SUBSCRIPTION") {
+                    // FIX v2.1.2: Server detected existing subscription
+                    hideProcessingState()
+                    Toast.makeText(this@PaywallActivity, "You already have an active subscription! Verifying...", Toast.LENGTH_LONG).show()
+                    // Force refresh license from server
+                    val result = licenseManager.forceVerifyLicense()
+                    if (result.isSuccess && result.getOrNull()?.isPro() == true) {
+                        proceedToApp()
+                    } else {
+                        Toast.makeText(this@PaywallActivity, "Subscription found but verification pending. Try 'Check Again'.", Toast.LENGTH_LONG).show()
+                        findViewById<LinearLayout>(R.id.check_again_section)?.visibility = View.VISIBLE
+                    }
+                } else if (approvalUrl != null) {
                     hideProcessingState()
                     markPaymentStarted()
 
@@ -356,6 +377,11 @@ class PaywallActivity : AppCompatActivity() {
                     val jsonResponse = org.json.JSONObject(responseBody)
                     val approvalUrl = jsonResponse.optString("approval_url", null)
                     approvalUrl
+                } else if (responseCode == 409) {
+                    // FIX v2.1.2: Handle duplicate subscription response
+                    val errorBody = connection.errorStream?.bufferedReader()?.readText()
+                    Log.w(TAG, "Duplicate subscription detected by server: $errorBody")
+                    "DUPLICATE_SUBSCRIPTION"  // Special marker to handle in caller
                 } else {
                     val errorBody = connection.errorStream?.bufferedReader()?.readText()
                     Log.e(TAG, "Create subscription failed: $responseCode - $errorBody")
