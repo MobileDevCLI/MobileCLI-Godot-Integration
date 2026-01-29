@@ -11,9 +11,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.lifecycleScope
 import com.termux.R
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Account/Settings Activity for MobileCLI Pro.
@@ -135,9 +140,17 @@ class AccountActivity : AppCompatActivity() {
         val license = licenseManager.getLicenseInfo()
 
         if (license?.isPro() == true) {
-            // Open PayPal subscription management
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PAYPAL_SUBSCRIPTIONS_URL))
-            startActivity(intent)
+            // Check subscription provider to decide where to send the user
+            lifecycleScope.launch {
+                val provider = getSubscriptionProvider()
+                if (provider == "stripe") {
+                    openStripePortal()
+                } else {
+                    // PayPal or legacy - open PayPal autopay page
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PAYPAL_SUBSCRIPTIONS_URL))
+                    startActivity(intent)
+                }
+            }
         } else {
             // Go to paywall to subscribe
             PaywallActivity.start(this)
@@ -145,10 +158,102 @@ class AccountActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Get the subscription provider (stripe or paypal) from the database.
+     */
+    private suspend fun getSubscriptionProvider(): String? = withContext(Dispatchers.IO) {
+        try {
+            val userId = SupabaseClient.getCurrentUserId() ?: return@withContext null
+            val subscriptions = SupabaseClient.client.postgrest
+                .from("subscriptions")
+                .select(columns = Columns.ALL) {
+                    filter { eq("user_id", userId) }
+                }
+                .decodeList<LicenseManager.Subscription>()
+
+            subscriptions.firstOrNull()?.provider
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get subscription provider", e)
+            null
+        }
+    }
+
+    /**
+     * Open Stripe Customer Portal for subscription management.
+     */
+    private fun openStripePortal() {
+        val userId = SupabaseClient.getCurrentUserId()
+        if (userId == null) {
+            Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Toast.makeText(this, "Opening subscription management...", Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch {
+            try {
+                val portalUrl = createPortalSession(userId)
+                if (portalUrl != null) {
+                    try {
+                        val customTabsIntent = CustomTabsIntent.Builder()
+                            .setShowTitle(true)
+                            .build()
+                        customTabsIntent.launchUrl(this@AccountActivity, Uri.parse(portalUrl))
+                    } catch (e: Exception) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(portalUrl))
+                        startActivity(intent)
+                    }
+                } else {
+                    Toast.makeText(this@AccountActivity, "Failed to open subscription portal", Toast.LENGTH_LONG).show()
+                    // Fallback to PayPal page
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PAYPAL_SUBSCRIPTIONS_URL))
+                    startActivity(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open Stripe portal", e)
+                Toast.makeText(this@AccountActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * Call create-portal-session Edge Function.
+     */
+    private suspend fun createPortalSession(userId: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val url = java.net.URL("https://mwxlguqukyfberyhtkmg.supabase.co/functions/v1/create-portal-session")
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 30000
+            connection.readTimeout = 30000
+
+            val json = """{"user_id": "$userId"}"""
+            connection.outputStream.bufferedWriter().use { it.write(json) }
+
+            val responseCode = connection.responseCode
+            Log.d(TAG, "Portal session response code: $responseCode")
+
+            if (responseCode == 200) {
+                val responseBody = connection.inputStream.bufferedReader().readText()
+                val jsonResponse = org.json.JSONObject(responseBody)
+                jsonResponse.optString("portal_url", null)
+            } else {
+                val errorBody = connection.errorStream?.bufferedReader()?.readText()
+                Log.e(TAG, "Portal session failed: $responseCode - $errorBody")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error calling create-portal-session API", e)
+            null
+        }
+    }
+
     private fun showDeleteAccountConfirmation() {
         AlertDialog.Builder(this)
             .setTitle("Delete Account")
-            .setMessage("This will permanently delete your account and all data. This action cannot be undone.\n\nIf you have an active subscription, please cancel it first in PayPal.")
+            .setMessage("This will permanently delete your account and all data. This action cannot be undone.\n\nIf you have an active subscription, please cancel it first via Manage Subscription (Stripe or PayPal).")
             .setPositiveButton("Delete") { _, _ ->
                 // For now, just show a message - actual deletion requires backend support
                 Toast.makeText(this, "Please email mobiledevcli@gmail.com to delete your account", Toast.LENGTH_LONG).show()

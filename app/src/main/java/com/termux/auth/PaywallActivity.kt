@@ -26,8 +26,9 @@ import kotlinx.coroutines.launch
  *
  * Shows subscription options and handles:
  * - Free trial (7 days)
+ * - Pro subscription ($15/month via Stripe card payment)
  * - Pro subscription ($15/month via PayPal)
- * - Redirects to PayPal subscription checkout
+ * - Redirects to Stripe/PayPal checkout
  */
 class PaywallActivity : AppCompatActivity() {
 
@@ -136,6 +137,7 @@ class PaywallActivity : AppCompatActivity() {
     private fun showProcessingState(message: String) {
         runOnUiThread {
             findViewById<ProgressBar>(R.id.progress_bar).visibility = View.VISIBLE
+            findViewById<Button>(R.id.stripe_subscribe_button).isEnabled = false
             findViewById<Button>(R.id.subscribe_button).isEnabled = false
             findViewById<Button>(R.id.start_trial_button).isEnabled = false
             findViewById<TextView>(R.id.restore_purchase).isEnabled = false
@@ -157,6 +159,7 @@ class PaywallActivity : AppCompatActivity() {
     private fun hideProcessingState() {
         runOnUiThread {
             findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
+            findViewById<Button>(R.id.stripe_subscribe_button).isEnabled = true
             findViewById<Button>(R.id.subscribe_button).isEnabled = true
             findViewById<Button>(R.id.start_trial_button).isEnabled = true
             findViewById<TextView>(R.id.restore_purchase).isEnabled = true
@@ -193,7 +196,12 @@ class PaywallActivity : AppCompatActivity() {
             startFreeTrial()
         }
 
-        // Subscribe Button
+        // Stripe Subscribe Button (Card)
+        findViewById<Button>(R.id.stripe_subscribe_button).setOnClickListener {
+            openStripeCheckout()
+        }
+
+        // PayPal Subscribe Button
         findViewById<Button>(R.id.subscribe_button).setOnClickListener {
             openCheckout()
         }
@@ -414,6 +422,114 @@ class PaywallActivity : AppCompatActivity() {
         }
 
         Toast.makeText(this, "Complete payment in PayPal - we'll verify when you return", Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * Open Stripe Checkout for card payment.
+     * Calls create-stripe-checkout Edge Function, then opens the checkout URL.
+     */
+    private fun openStripeCheckout() {
+        val userId = SupabaseClient.getCurrentUserId()
+
+        if (userId == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Check for existing subscription
+        val existingLicense = licenseManager.getLicenseInfo()
+        if (existingLicense?.isPro() == true) {
+            Log.i(TAG, "User already has Pro subscription, preventing duplicate")
+            Toast.makeText(this, "You already have an active subscription!", Toast.LENGTH_LONG).show()
+            proceedToApp()
+            return
+        }
+
+        Log.d(TAG, "Creating Stripe checkout for user: $userId")
+        showProcessingState("Setting up card payment...")
+
+        lifecycleScope.launch {
+            try {
+                val checkoutUrl = createStripeCheckoutSession(userId)
+
+                if (checkoutUrl == "DUPLICATE_SUBSCRIPTION") {
+                    hideProcessingState()
+                    Toast.makeText(this@PaywallActivity, "You already have an active subscription! Verifying...", Toast.LENGTH_LONG).show()
+                    val result = licenseManager.forceVerifyLicense()
+                    if (result.isSuccess && result.getOrNull()?.isPro() == true) {
+                        proceedToApp()
+                    } else {
+                        Toast.makeText(this@PaywallActivity, "Subscription found but verification pending. Try 'Check Again'.", Toast.LENGTH_LONG).show()
+                        findViewById<LinearLayout>(R.id.check_again_section)?.visibility = View.VISIBLE
+                    }
+                } else if (checkoutUrl != null) {
+                    hideProcessingState()
+                    markPaymentStarted()
+
+                    // Open Stripe Checkout page in Custom Tab
+                    try {
+                        val customTabsIntent = CustomTabsIntent.Builder()
+                            .setShowTitle(true)
+                            .build()
+                        customTabsIntent.launchUrl(this@PaywallActivity, Uri.parse(checkoutUrl))
+                    } catch (e: Exception) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(checkoutUrl))
+                        startActivity(intent)
+                    }
+
+                    Toast.makeText(this@PaywallActivity, "Complete payment in Stripe checkout", Toast.LENGTH_LONG).show()
+                } else {
+                    hideProcessingState()
+                    Toast.makeText(this@PaywallActivity, "Failed to create checkout session. Please try again.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to create Stripe checkout", e)
+                hideProcessingState()
+                Toast.makeText(this@PaywallActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * Call create-stripe-checkout Edge Function to get a checkout URL.
+     */
+    private suspend fun createStripeCheckoutSession(userId: String): String? {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val url = java.net.URL("https://mwxlguqukyfberyhtkmg.supabase.co/functions/v1/create-stripe-checkout")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                connection.connectTimeout = 30000
+                connection.readTimeout = 30000
+
+                val json = """{"user_id": "$userId"}"""
+                connection.outputStream.bufferedWriter().use { it.write(json) }
+
+                val responseCode = connection.responseCode
+                Log.d(TAG, "Stripe checkout response code: $responseCode")
+
+                if (responseCode == 200) {
+                    val responseBody = connection.inputStream.bufferedReader().readText()
+                    Log.d(TAG, "Stripe checkout response: $responseBody")
+
+                    val jsonResponse = org.json.JSONObject(responseBody)
+                    jsonResponse.optString("checkout_url", null)
+                } else if (responseCode == 409) {
+                    val errorBody = connection.errorStream?.bufferedReader()?.readText()
+                    Log.w(TAG, "Duplicate subscription detected: $errorBody")
+                    "DUPLICATE_SUBSCRIPTION"
+                } else {
+                    val errorBody = connection.errorStream?.bufferedReader()?.readText()
+                    Log.e(TAG, "Stripe checkout failed: $responseCode - $errorBody")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error calling create-stripe-checkout API", e)
+                null
+            }
+        }
     }
 
     private fun restorePurchase() {
