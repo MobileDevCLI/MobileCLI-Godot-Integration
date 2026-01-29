@@ -476,6 +476,12 @@ class MainActivity : AppCompatActivity(), TerminalViewClient, TerminalSessionCli
             drawerLayout.closeDrawers()
         }
 
+        // Godot CLI
+        findViewById<TextView>(R.id.nav_godot)?.setOnClickListener {
+            installGodotCLI()
+            drawerLayout.closeDrawers()
+        }
+
         // AI Briefing - Fetches comprehensive documentation for AI assistants
         findViewById<TextView>(R.id.nav_ai_briefing)?.setOnClickListener {
             showAIBriefing()
@@ -1000,6 +1006,29 @@ class MainActivity : AppCompatActivity(), TerminalViewClient, TerminalSessionCli
                         val cmd = "echo 'Installing Supabase CLI...' && pkg install -y golang && go install github.com/supabase/cli@v1.220.0 && mv ~/go/bin/cli ~/go/bin/supabase 2>/dev/null; grep -q 'go/bin' ~/.bashrc || echo 'export PATH=\"\$HOME/go/bin:\$PATH\"' >> ~/.bashrc && export PATH=\"\$HOME/go/bin:\$PATH\" && echo '' && echo 'Supabase CLI installed! Starting login...' && echo '' && supabase login\n"
                         session?.write(cmd.toByteArray(), 0, cmd.length)
                         Toast.makeText(this@MainActivity, "Installing Supabase CLI in new tab...", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun installGodotCLI() {
+        AlertDialog.Builder(this)
+            .setTitle("Install Godot CLI")
+            .setMessage(
+                "This opens a new terminal tab to install Godot Engine CLI.\n\n" +
+                "Installs proot-distro with Arch Linux ARM, then Godot Engine (~200MB).\n\n" +
+                "Claude can then create, validate, and export Godot projects headlessly."
+            )
+            .setPositiveButton("Install") { _, _ ->
+                createSession()
+                lifecycleScope.launch {
+                    delay(500)
+                    withContext(Dispatchers.Main) {
+                        val cmd = "install-godot\n"
+                        session?.write(cmd.toByteArray(), 0, cmd.length)
+                        Toast.makeText(this@MainActivity, "Installing Godot CLI in new tab...", Toast.LENGTH_LONG).show()
                     }
                 }
             }

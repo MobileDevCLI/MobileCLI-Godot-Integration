@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" fill="#2d2d2d"/>
+  <rect x="24" y="40" width="80" height="60" fill="#555" stroke="#888" stroke-width="2"/>
+  <rect x="24" y="40" width="80" height="30" fill="#666"/>
+  <line x1="24" y1="70" x2="104" y2="70" stroke="#888" stroke-width="1"/>
+  <rect x="52" y="76" width="24" height="24" fill="#333"/>
+  <rect x="32" y="48" width="16" height="14" fill="#89c4f4"/>
+  <rect x="80" y="48" width="16" height="14" fill="#89c4f4"/>
+  <rect x="32" y="78" width="16" height="14" fill="#89c4f4"/>
+  <rect x="80" y="78" width="16" height="14" fill="#89c4f4"/>
+  <text x="64" y="24" text-anchor="middle" fill="#fff" font-size="12" font-family="monospace">COD</text>
+</svg>

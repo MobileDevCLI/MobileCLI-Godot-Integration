@@ -32,6 +32,13 @@ MobileCLI provides nearly complete device access through Android's permission sy
 | **Biometrics** | Fingerprint authentication |
 | **System** | Notifications, wake locks, boot receiver |
 
+### Godot Engine CLI
+- **Godot 4** via proot-distro + Arch Linux ARM
+- Headless game project creation and validation
+- AI-powered game development (Claude can create full Godot projects)
+- Example project included: CoD-style building demo
+- See [docs/GODOT_SETUP.md](docs/GODOT_SETUP.md) for setup details
+
 ### Development Environment
 - **Node.js** - JavaScript runtime for AI tools
 - **Python** - Scripting and automation
@@ -325,6 +332,7 @@ See [ROADMAP.md](ROADMAP.md) for the full development roadmap.
 - [x] GitHub backup
 
 ### Recently Added
+- [x] **Godot CLI drawer button** - One-tap install Godot Engine via proot-distro + Arch Linux ARM
 - [x] **Vercel CLI drawer button** - One-tap install + OAuth login in new terminal tab
 - [x] **GitHub CLI drawer button** - One-tap install gh + git + OAuth in new terminal tab
 - [x] Background setup - continues even if you leave the app or screen turns off
